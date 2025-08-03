@@ -10,9 +10,9 @@ function App() {
   const [postContent, setPostContent] = useState("");
   const [totalPosts, setTotalPosts] = useState(0);
   const [contract, setContract] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
   const [language, setLanguage] = useState("fr");
 
-  // Initialise le contrat quand walletAddress change
   useEffect(() => {
     const initContract = async () => {
       if (!walletAddress) {
@@ -23,7 +23,6 @@ function App() {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
-        // ✅ Utiliser directement contractABI car c’est déjà un tableau
         const socialContract = new ethers.Contract(
           contractAddress,
           contractABI,
@@ -33,12 +32,18 @@ function App() {
 
         const postsCount = await socialContract.totalPosts();
         setTotalPosts(Number(postsCount));
+        setErrorMessage("");
       } catch (err) {
         console.error("Erreur init contract:", err);
+        setErrorMessage(
+          language === "fr"
+            ? "⚠ Impossible de se connecter au contrat. Vérifie que tu es sur le réseau Base Sepolia ou Sepolia, et reconnecte ton wallet."
+            : "⚠ Unable to connect to contract. Make sure you are on Base Sepolia or Sepolia network, then reconnect your wallet."
+        );
       }
     };
     initContract();
-  }, [walletAddress]);
+  }, [walletAddress, language]);
 
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -54,6 +59,7 @@ function App() {
         method: "eth_requestAccounts",
       });
       setWalletAddress(accounts[0]);
+      setErrorMessage("");
     } catch (err) {
       console.error(err);
     }
@@ -64,6 +70,7 @@ function App() {
     setContract(null);
     setPostContent("");
     setTotalPosts(0);
+    setErrorMessage("");
   };
 
   const createPost = async () => {
@@ -75,7 +82,7 @@ function App() {
       );
       return;
     }
-    if (!postContent.trim()) {
+    if (!postContent) {
       alert(
         language === "fr"
           ? "Le contenu du post ne peut pas être vide."
@@ -84,13 +91,8 @@ function App() {
       return;
     }
     try {
-      console.log("📤 Création du post avec contenu:", postContent);
       const tx = await contract.createPost(postContent);
-      console.log("✅ Transaction envoyée. Hash :", tx.hash);
-
-      await tx.wait(); // attendre confirmation
-      console.log("📦 Transaction confirmée");
-
+      await tx.wait();
       alert(
         language === "fr"
           ? "Post créé avec succès !"
@@ -99,13 +101,9 @@ function App() {
       setPostContent("");
 
       const postsCount = await contract.totalPosts();
-      console.log(
-        "📊 Nombre total de posts récupéré :",
-        postsCount.toString()
-      );
       setTotalPosts(Number(postsCount));
     } catch (err) {
-      console.error("❌ Erreur création post :", err);
+      console.error("Erreur création post :", err);
       alert(
         language === "fr"
           ? "Erreur lors de la création du post."
@@ -162,7 +160,21 @@ function App() {
         style={{ maxWidth: "200px", margin: "20px 0" }}
       />
 
-      {walletAddress && (
+      {errorMessage && (
+        <div
+          style={{
+            backgroundColor: "#ffe0e0",
+            padding: "10px",
+            borderRadius: "5px",
+            color: "#b00000",
+            marginBottom: "15px",
+          }}
+        >
+          {errorMessage}
+        </div>
+      )}
+
+      {walletAddress && !errorMessage && (
         <>
           <div>
             <textarea
@@ -180,8 +192,7 @@ function App() {
             </button>
           </div>
           <p>
-            {language === "fr" ? "Total posts :" : "Total posts:"}{" "}
-            {totalPosts}
+            {language === "fr" ? "Total posts :" : "Total posts:"} {totalPosts}
           </p>
         </>
       )}
